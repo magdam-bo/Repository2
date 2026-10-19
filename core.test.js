@@ -54,3 +54,10 @@ test('transposition preserves independent voicing and slash bass',()=>{
  assert.deepEqual(invertNotes([48,52,55,59],1),[52,55,59,60]);assert.deepEqual(invertNotes([48,52,55,59],3),[59,60,64,67]);
  assert.throws(()=>transposeProgression([{symbol:'C',notes:[108],beats:4}],1));
 });
+import {degreeName} from './theory.js';
+test('degree names follow tonic, chord quality, alterations and slash bass',()=>{
+ assert.deepEqual(['Cmaj7','Am7','Dm7','G7'].map(s=>degreeName(s)),['Imaj7','VIm7','IIm7','V7']);
+ assert.equal(degreeName('C/E'),'I/III');assert.equal(degreeName('Bb7'),'♭VII7');assert.equal(degreeName('F#dim'),'♯IVdim');
+ assert.equal(degreeName('G7',7),'I7');assert.equal(degreeName('C/E',7),'IV/VI');
+ assert.equal(degreeName('C#maj7',1),'Imaj7');
+});

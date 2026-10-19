@@ -45,3 +45,12 @@ export function invertNotes(notes, inversion) {
   for(let i=0;i<inversion;i++){let note=result.shift();while(note<=result.at(-1))note+=12;result.push(note);}
   if(result.some(n=>n>108))throw new Error('転回後の音高が上限を超えます');return result;
 }
+// Uppercase Roman degrees retain the chord quality (e.g. VIm7).
+// Accidentals are measured against the selected major-key tonic.
+export function degreeName(symbol, tonic=0) {
+  const normalized=parseChord(symbol).symbol;
+  const match=/^([A-G])([#b]?)([^/]*)(?:\/([A-G])([#b]?))?$/.exec(normalized);
+  const degrees=['I','♭II','II','♭III','III','IV','♯IV','V','♭VI','VI','♭VII','VII'];
+  const degree=(letter,accidental)=>degrees[mod(PITCH[letter]+(accidental==='#'?1:accidental==='b'?-1:0)-tonic)];
+  return degree(match[1],match[2])+match[3]+(match[4]?'/'+degree(match[4],match[5]):'');
+}

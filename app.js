@@ -1,5 +1,5 @@
-import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes} from './theory.js?v=4';
-import {AudioEngine} from './audio.js?v=4';
+import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes,degreeName,NAMES} from './theory.js?v=5';
+import {AudioEngine} from './audio.js?v=5';
 const $ = selector => document.querySelector(selector);
 const presets={jazz:['Cmaj7','Am7','Dm7','G7'],pop:['C','G','Am','F'],minor:['Am7','Dm7','G7','Cmaj7']};
 let chords=presets.jazz.map(s=>makeChord(s));
@@ -38,6 +38,7 @@ function render(){
   chords.forEach((chord,index)=>{
     const card=document.createElement('article');card.className='chord-card';card.classList.toggle('selected',index===selected);
     card.innerHTML=`<div class="card-top"><span>CHORD ${String(index+1).padStart(2,'0')}</span><span class="playing-tag">● PLAYING</span></div><input class="chord-name" aria-label="コード ${index+1} の名前" maxlength="24" spellcheck="false"><div class="notes"></div><div class="card-bottom"><label><input class="beats" aria-label="コード ${index+1} の拍数" type="number" min="0.25" max="32" step="0.25">拍</label></div><div class="card-actions"><button class="audition" aria-label="コード ${index+1} を試聴">▶ 試聴</button><button class="edit" aria-label="コード ${index+1} の詳細">詳細</button><button class="duplicate" aria-label="コード ${index+1} を複製">複製</button><button class="move-left" aria-label="コード ${index+1} を前へ">←</button><button class="move-right" aria-label="コード ${index+1} を後へ">→</button><button class="delete" aria-label="コード ${index+1} を削除">削除</button></div><div class="card-progress"></div>`;
+    const degree=document.createElement('div');degree.className='degree-label';degree.setAttribute('aria-label','コード '+(index+1)+' のディグリーネーム');degree.textContent=degreeName(chord.symbol,Number($('#key').value));card.querySelector('.chord-name').before(degree);
     const name=card.querySelector('.chord-name');name.value=chord.symbol;
     card.querySelector('.notes').textContent=chord.notes.map(noteName).join(' · ');
     const beats=card.querySelector('.beats');beats.value=chord.beats;
@@ -50,7 +51,7 @@ function render(){
       chord.beats=value;
     };
     card.querySelector('.audition').onclick=()=>preview(index);
-    card.querySelector('.edit').onclick=()=>{selected=index;render();$('#voicing-panel').open=true;};
+    card.querySelector('.edit').onclick=()=>{selected=index;render();const panel=$('#voicing-panel');panel.open=true;requestAnimationFrame(()=>panel.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}));};
     card.querySelector('.duplicate').onclick=()=>change(()=>{if(chords.length>=64)throw new Error('コードは64個までです');chords.splice(index+1,0,{...structuredClone(chord),id:crypto.randomUUID()});selected=index+1;});
     card.querySelector('.delete').disabled=chords.length===1;
     card.querySelector('.delete').onclick=()=>change(()=>{chords.splice(index,1);selected=Math.min(selected,chords.length-1);});
@@ -96,7 +97,7 @@ function renderEditor(){
  $('#piano-roll').scrollTop=Math.max(0,(108-Math.max(...chord.notes))*25-10);
 }
 $('#add-chord').onclick=()=>change(()=>{if(chords.length>=64)throw new Error('コードは64個までです');chords.push(makeChord('C'));selected=chords.length-1;});
-for(const [id,step] of [['#transpose-down',-1],['#transpose-up',1]])$(id).onclick=()=>change(()=>{chords=transposeProgression(chords,step);});
+for(const [id,step] of [['#transpose-down',-1],['#transpose-up',1]])$(id).onclick=()=>change(()=>{chords=transposeProgression(chords,step);$('#key').value=mod(Number($('#key').value)+step);});
 $('#inversion').onchange=event=>change(()=>setNotes(invertNotes(parseChord(chords[selected].symbol).notes,Number(event.target.value))));
 for(const [id,step] of [['#octave-down',-12],['#octave-up',12]])$(id).onclick=()=>change(()=>setNotes(chords[selected].notes.map(n=>n+step)));
 $('#closed').onclick=()=>change(()=>{const notes=chords[selected].notes,bass=notes[0];setNotes([bass,...notes.slice(1).map(n=>{let x=bass+mod(n-bass);return x===bass?x+12:x;})]);});
@@ -104,15 +105,18 @@ $('#open').onclick=()=>change(()=>setNotes(chords[selected].notes.map((n,i)=>n+(
 $('#reset-voice').onclick=()=>change(()=>setNotes(parseChord(chords[selected].symbol).notes));
 $('#add-note').onclick=()=>change(()=>{const notes=chords[selected].notes;let midi=notes.at(-1)+3;if(midi>108){midi=21;while(notes.includes(midi))midi++;}setNotes([...notes,midi]);});
 $('#preview-voice').onclick=()=>preview();
-function project(){return {format:'chord-lab',version:1,bpm:Number($('#bpm').value),loop:$('#loop').checked,volume:Number($('#volume').value),chords};}
+function project(){return {format:'chord-lab',version:1,key:Number($('#key').value),bpm:Number($('#bpm').value),loop:$('#loop').checked,volume:Number($('#volume').value),chords};}
 function loadProject(data){
  if(data?.format!=='chord-lab'||data.version!==1)throw new Error('Chord Lab v1のJSONを選択してください');
  const next=validateProgression(data.chords);
+ const key=data.key??0;if(!Number.isInteger(key)||key<0||key>11)throw new Error('基準キーが不正です');
  if(!Number.isInteger(data.bpm)||data.bpm<40||data.bpm>240||typeof data.loop!=='boolean'||!Number.isFinite(data.volume)||data.volume<0||data.volume>100)throw new Error('演奏設定が不正です');
- chords=next;selected=0;$('#bpm').value=data.bpm;$('#loop').checked=data.loop;$('#volume').value=data.volume;$('#volume').dispatchEvent(new Event('input'));render();
+ chords=next;selected=0;$('#key').value=key;$('#bpm').value=data.bpm;$('#loop').checked=data.loop;$('#volume').value=data.volume;$('#volume').dispatchEvent(new Event('input'));render();
 }
 $('#save').onclick=()=>{try{localStorage.setItem('chord-lab-project',JSON.stringify(project()));$('#status').textContent='このブラウザにボイシングを含めて保存しました';}catch{error(new Error('保存できません。JSON書出をご利用ください'));}};
 $('#load').onclick=()=>change(()=>{const saved=localStorage.getItem('chord-lab-project');if(!saved)throw new Error('保存された進行がありません');loadProject(JSON.parse(saved));});
 $('#export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(project(),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='chord-lab-progression.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 $('#import').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;try{if(file.size>1024*1024)throw new Error('JSONは1MB以下にしてください');const data=JSON.parse(await file.text());change(()=>loadProject(data));}catch(err){error(err);}event.target.value='';};
+NAMES.forEach((name,index)=>{const option=document.createElement('option');option.value=index;option.textContent=name+'メジャー';$('#key').append(option);});
+$('#key').onchange=()=>document.querySelectorAll('.degree-label').forEach((label,index)=>{label.textContent=degreeName(chords[index].symbol,Number($('#key').value));});
 buildKeyboard();render();
