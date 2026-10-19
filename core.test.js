@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseChord,validateProgression,noteName} from './theory.js';
 import {AudioEngine} from './audio.js';
-class Param {setValueAtTime(){}linearRampToValueAtTime(){}exponentialRampToValueAtTime(){}setTargetAtTime(){}}
+class Param {constructor(){this.ramps=[];}setValueAtTime(){}linearRampToValueAtTime(value,time){this.ramps.push({value,time});}exponentialRampToValueAtTime(){}setTargetAtTime(){}}
 class Node {connect(){}disconnect(){}}
 class Osc extends Node {constructor(){super();this.frequency={};this.stops=[];}start(t){this.started=t;}stop(t){this.stops.push(t);}}
-function context(){return {currentTime:0,state:'running',destination:{},osc:[],createGain(){const n=new Node();n.gain=new Param();return n;},createDynamicsCompressor(){return new Node();},createOscillator(){const n=new Osc();this.osc.push(n);return n;},async resume(){this.state='running';}};}
+function context(){return {currentTime:0,state:'running',destination:{},osc:[],gains:[],createGain(){const n=new Node();n.gain=new Param();this.gains.push(n);return n;},createDynamicsCompressor(){return new Node();},createOscillator(){const n=new Osc();this.osc.push(n);return n;},async resume(){this.state='running';}};}
 const progression=['Cmaj7','Am7','Dm7','G7'].map(symbol=>({...parseChord(symbol),beats:4}));
 test('default progression and supported symbols resolve to MIDI notes',()=>{
  assert.deepEqual(progression.map(c=>c.notes),[[48,52,55,59],[57,60,64,67],[50,53,57,60],[55,59,62,65]]);
@@ -60,4 +60,14 @@ test('degree names follow tonic, chord quality, alterations and slash bass',()=>
  assert.equal(degreeName('C/E'),'I/III');assert.equal(degreeName('Bb7'),'♭VII7');assert.equal(degreeName('F#dim'),'♯IVdim');
  assert.equal(degreeName('G7',7),'I7');assert.equal(degreeName('C/E',7),'IV/VI');
  assert.equal(degreeName('C#maj7',1),'Imaj7');
+});
+
+test('bass compensation raises low-note energy without changing pitch or timing',async()=>{
+ const ctx=context();const engine=new AudioEngine({contextFactory:()=>ctx});await engine.unlock();
+ engine.sound([36],1,1);engine.sound([48],2,1);engine.sound([60],3,1);
+ const peaks=ctx.gains.slice(1).map(g=>g.gain.ramps[0].value);
+ assert.ok(peaks[0]>peaks[3]&&peaks[3]>peaks[6]);assert.ok(peaks[0]<=peaks[6]*1.8+1e-12);
+ assert.ok(peaks[1]/peaks[0]>peaks[7]/peaks[6]);
+ assert.ok(Math.abs(ctx.osc[0].frequency.value-65.406391)<.001);
+ assert.deepEqual(ctx.osc.map(o=>o.started),[1,1,1,2,2,2,3,3,3]);engine.stop();
 });

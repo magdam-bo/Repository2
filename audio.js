@@ -34,8 +34,12 @@ export class AudioEngine {
   }
   note(midi, time, duration, level) {
     const ctx=this.context, frequency=440*2**((midi-69)/12);
-    // Additive, decaying partials give a lightweight piano-like sound.
-    for(const [ratio,amplitude] of [[1,1],[2,.32],[3,.12]]) {
+    // Bass compensation is capped below C2 and fades to zero at C4.
+    // Extra upper partials keep low notes recognizable on small speakers.
+    const bassWeight=Math.max(0,Math.min(1,(60-midi)/24));
+    const bassGain=1+.8*bassWeight;
+    const partials=[[1,bassGain],[2,bassGain*(.32+.24*bassWeight)],[3,bassGain*(.12+.14*bassWeight)]];
+    for(const [ratio,amplitude] of partials) {
       const osc=ctx.createOscillator(), env=ctx.createGain();
       osc.type='sine'; osc.frequency.value=frequency*ratio;
       const end=time+duration;

@@ -1,5 +1,5 @@
-import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes,degreeName,NAMES} from './theory.js?v=5';
-import {AudioEngine} from './audio.js?v=5';
+import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes,degreeName,NAMES} from './theory.js?v=6';
+import {AudioEngine} from './audio.js?v=6';
 const $ = selector => document.querySelector(selector);
 const presets={jazz:['Cmaj7','Am7','Dm7','G7'],pop:['C','G','Am','F'],minor:['Am7','Dm7','G7','Cmaj7']};
 let chords=presets.jazz.map(s=>makeChord(s));
