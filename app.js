@@ -1,9 +1,9 @@
-import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes} from './theory.js?v=3';
-import {AudioEngine} from './audio.js?v=3';
+import {makeChord,parseChord,noteName,mod,validateProgression,transposeProgression,invertNotes} from './theory.js?v=4';
+import {AudioEngine} from './audio.js?v=4';
 const $ = selector => document.querySelector(selector);
 const presets={jazz:['Cmaj7','Am7','Dm7','G7'],pop:['C','G','Am','F'],minor:['Am7','Dm7','G7','Cmaj7']};
 let chords=presets.jazz.map(s=>makeChord(s));
-let selected=0, active=-1;
+let selected=0, active=-1, lastKeyboardSignature="";
 const engine=new AudioEngine({onState:(playing,message)=>{
   $('#play').disabled=playing;$('#status').textContent=message;
   $('#status').classList.remove('error');
@@ -29,8 +29,11 @@ function showNotes(index){
   $('#current-symbol').textContent=chord.symbol;
   $('#note-names').textContent=chord.notes.map(noteName).join(' · ');
   document.querySelectorAll('.key').forEach(key=>key.classList.toggle('on',chord.notes.includes(Number(key.dataset.midi))));
+  const signature=chord.notes.join(',');if(signature!==lastKeyboardSignature){lastKeyboardSignature=signature;const key=document.querySelector('.key.on');if(key) $('.keyboard-scroll').scrollLeft=Math.max(0,key.offsetLeft-50);}
 }
 function render(){
+  const match=Object.entries(presets).find(([,symbols])=>symbols.length===chords.length&&symbols.every((symbol,i)=>chords[i].symbol===symbol&&chords[i].beats===4&&chords[i].notes.join(',')===parseChord(symbol).notes.join(',')));
+  $('#preset').value=match?match[0]:'custom';
   $('#cards').replaceChildren();
   chords.forEach((chord,index)=>{
     const card=document.createElement('article');card.className='chord-card';card.classList.toggle('selected',index===selected);
@@ -83,13 +86,14 @@ function noteSelect(current,min=21,max=108){const select=document.createElement(
 function renderEditor(){
  const chord=chords[selected];if(!chord)return;
  $('#edit-symbol').textContent=chord.symbol;
- $('#inversion').value='0';$('#inversion').querySelector('option[value="3"]').disabled=parseChord(chord.symbol).notes.length<4;
+ $('#inversion').value='' ;$('#inversion').querySelector('option[value="3"]').disabled=parseChord(chord.symbol).notes.length<4;
  const oldBass=$('#bass'),bass=noteSelect(chord.notes[0],21,(chord.notes[1]??109)-1);bass.id='bass';oldBass.replaceWith(bass);
  bass.onchange=()=>change(()=>setNotes([Number(bass.value),...chord.notes.slice(1)]));
  $('#note-editor').replaceChildren();
  chord.notes.forEach((midi,index)=>{const row=document.createElement('div');row.className='note-row';const label=document.createElement('label');label.textContent='構成音 '+(index+1);const select=noteSelect(midi);select.setAttribute('aria-label','構成音 '+(index+1)+' の音高');label.append(select);row.append(label);select.onchange=()=>change(()=>{const notes=[...chord.notes];notes[index]=Number(select.value);setNotes(notes);});const remove=document.createElement('button');remove.textContent='削除';remove.setAttribute('aria-label','構成音 '+(index+1)+' を削除');remove.disabled=chord.notes.length===1;remove.onclick=()=>change(()=>setNotes(chord.notes.filter((_,i)=>i!==index)));row.append(remove);$('#note-editor').append(row);});
  $('#piano-roll').replaceChildren();
  for(let midi=108;midi>=21;midi--){const row=document.createElement('button');const on=chord.notes.includes(midi);row.className='roll-row'+(on?' on':'')+([1,3,6,8,10].includes(mod(midi))?' accidental':'');row.setAttribute('aria-label',noteName(midi)+(on?' を削除':' を追加'));row.setAttribute('aria-pressed',String(on));const label=document.createElement('span');label.textContent=noteName(midi);const bar=document.createElement('i');row.append(label,bar);row.onclick=()=>change(()=>setNotes(on?chord.notes.filter(n=>n!==midi):[...chord.notes,midi]));$('#piano-roll').append(row);}
+ $('#piano-roll').scrollTop=Math.max(0,(108-Math.max(...chord.notes))*25-10);
 }
 $('#add-chord').onclick=()=>change(()=>{if(chords.length>=64)throw new Error('コードは64個までです');chords.push(makeChord('C'));selected=chords.length-1;});
 for(const [id,step] of [['#transpose-down',-1],['#transpose-up',1]])$(id).onclick=()=>change(()=>{chords=transposeProgression(chords,step);});
