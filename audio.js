@@ -11,7 +11,10 @@ export class AudioEngine {
       this.context=this.contextFactory();
       this.master=this.context.createGain(); this.master.gain.value=this.volume*.7;
       const compressor=this.context.createDynamicsCompressor();
-      this.master.connect(compressor); compressor.connect(this.context.destination);
+      this.master.connect(compressor);
+      this.analyser=this.context.createAnalyser?.();
+      if(this.analyser){this.analyser.fftSize=256;this.samples=new Float32Array(256);compressor.connect(this.analyser);this.analyser.connect(this.context.destination);}
+      else compressor.connect(this.context.destination);
       this.context.onstatechange=()=>{
         if(this.playing && this.context.state!=='running') this.stop('音声が中断されました。再生ボタンで再開できます');
       };
@@ -76,7 +79,8 @@ export class AudioEngine {
     }
     this.events=this.events.filter(e=>e.end>now);
     const event=this.events.find(e=>e.start<=now&&e.end>now);
-    if(event) this.onPosition({index:event.index,fraction:(now-event.start)/(event.end-event.start),beat:Math.floor((now-event.start)*this.bpm/60)%4});
+    let rms=0;if(this.analyser){this.analyser.getFloatTimeDomainData(this.samples);rms=Math.sqrt(this.samples.reduce((a,x)=>a+x*x,0)/this.samples.length);}
+    if(event) this.onPosition({level:rms,index:event.index,fraction:(now-event.start)/(event.end-event.start),beat:Math.floor((now-event.start)*this.bpm/60)%4});
     if(now>=this.finishTime) this.stop('再生が終了しました');
   }
   stop(message='停止中') {

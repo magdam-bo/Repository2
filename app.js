@@ -9,6 +9,8 @@ const engine=new AudioEngine({onState:(playing,message)=>{
   $('#status').classList.remove('error');
 },onPosition:position=>{
   active=position?.index??-1;
+  $('#audio-signal').textContent=position?.level>.00001?'音声出力中':'音声待機';
+  $('#audio-signal').dataset.level=String(position?.level??0);
   document.querySelectorAll('.chord-card').forEach((card,i)=>{
     card.classList.toggle('playing',i===active);
     card.querySelector('.card-progress').style.width=(i===active?position.fraction*100:0)+'%';
