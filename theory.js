@@ -26,8 +26,22 @@ export function validateProgression(chords) {
   if (!Array.isArray(chords) || !chords.length || chords.length > 64) throw new Error('コード数は1〜64個にしてください');
   return chords.map(chord => {
     const {symbol} = parseChord(chord.symbol);
-    if (!Number.isFinite(chord.beats) || chord.beats < .25 || chord.beats > 32) throw new Error('拍数は0.25〜32で指定してください');
+    if (!Number.isFinite(chord.beats) || chord.beats < .25 || chord.beats > 32 || chord.beats*4%1!==0) throw new Error('拍数は0.25〜32で指定してください');
     if (!Array.isArray(chord.notes) || !chord.notes.length || chord.notes.length>16 || chord.notes.some(n=>!Number.isInteger(n)||n<21||n>108)) throw new Error('音高はMIDI 21〜108、構成音は1〜16音で指定してください');
     return {id:crypto.randomUUID(), symbol, beats:chord.beats, notes:[...new Set(chord.notes)].sort((a,b)=>a-b)};
   });
+}
+export function transposeSymbol(symbol, semitones) {
+  parseChord(symbol);
+  const normalized=symbol.replaceAll('♯','#').replaceAll('♭','b');
+  return normalized.replace(/(^|\/)([A-G])([#b]?)/g,(_,prefix,letter,acc)=>prefix+NAMES[mod(PITCH[letter]+(acc==='#'?1:acc==='b'?-1:0)+semitones)]);
+}
+export function transposeProgression(chords, semitones) {
+  const next=chords.map(c=>({...c,symbol:transposeSymbol(c.symbol,semitones),notes:c.notes.map(n=>n+semitones)}));
+  validateProgression(next); return next;
+}
+export function invertNotes(notes, inversion) {
+  const result=[...notes].sort((a,b)=>a-b);
+  for(let i=0;i<inversion;i++){let note=result.shift();while(note<=result.at(-1))note+=12;result.push(note);}
+  if(result.some(n=>n>108))throw new Error('転回後の音高が上限を超えます');return result;
 }

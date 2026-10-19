@@ -47,3 +47,10 @@ test('loop can be disabled on last chord and enabled before natural end',async()
  await engine.play([progression[0]],{bpm:240,loop:true});engine.setLoop(false);ctx.currentTime=1.07;engine.tick();assert.equal(engine.playing,false);
  await engine.play([progression[0]],{bpm:240});engine.setLoop(true);assert.equal(engine.finishTime,Infinity);ctx.currentTime=2.1;engine.tick();assert.equal(engine.playing,true);engine.stop();
 });
+import {transposeSymbol,transposeProgression,invertNotes} from './theory.js';
+test('transposition preserves independent voicing and slash bass',()=>{
+ assert.equal(transposeSymbol('C/E',1),'C#/F');assert.equal(transposeSymbol('Bbm7',-1),'Am7');
+ const custom=[{symbol:'Cmaj7',notes:[48,55,59,64],beats:4}];assert.deepEqual(transposeProgression(custom,2)[0].notes,[50,57,61,66]);
+ assert.deepEqual(invertNotes([48,52,55,59],1),[52,55,59,60]);assert.deepEqual(invertNotes([48,52,55,59],3),[59,60,64,67]);
+ assert.throws(()=>transposeProgression([{symbol:'C',notes:[108],beats:4}],1));
+});
